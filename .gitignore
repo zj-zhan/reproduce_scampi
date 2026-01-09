@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyc
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+*.pkl
+*.log
+*.csv
+.idea
+results/
