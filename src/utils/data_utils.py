@@ -11,7 +11,7 @@ from PIL import Image
 import random
 from typing import Union, List, Tuple
 import scipy.io as sio
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torch.utils.data.dataset import Dataset
