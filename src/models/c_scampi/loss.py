@@ -1,15 +1,9 @@
-__author__ = "Volker Herold, Thomas Siedler"
-__year__ = "2023"
-__version__ = "0.0.1"
-
-# Imports
-
 import torch
 import torch.nn.functional as F
 from torch.nn.modules.loss import _Loss, L1Loss, MSELoss
 from pytorch_wavelets import DWTForward
-from utils.data_utils import toComplex, toReal, fdiff
-from utils.cartesian.transforms import kspace2image_torch, image2kspace_torch
+from src.utils.data_utils import toComplex, toReal, fdiff
+from src.utils.cartesian.transforms import kspace2image_torch, image2kspace_torch
 from functools import partial
 
 

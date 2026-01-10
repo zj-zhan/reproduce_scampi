@@ -1,13 +1,7 @@
-__author__ = "Volker Herold"
-__year__ = "2023"
-__version__ = "0.0.1"
-
-# Imports
-
 import torch
 import torch.nn.functional as F
 from torch.nn.modules.loss import _Loss  # , L1Loss, MSELoss
-from utils.data_utils import toComplex, toReal  # , sobel_operator
+from src.utils.data_utils import toComplex, toReal  # , sobel_operator
 
 
 class L1L2Loss(_Loss):

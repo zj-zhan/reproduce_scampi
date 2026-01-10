@@ -1,13 +1,6 @@
-__author__ = "Volker Herold, Thomas Siedler"
-__year__ = "2022"
-__status__ = "Experimental"
-
 import math
 import torch
-
-
-from utils.plot_utils import plot_traj
-
+from src.utils.plot_utils import plot_traj
 
 def generate_golden_angle_radial_sampling_pattern(spoke_length, num_spokes, dtype=torch.float32):
     theta = torch.zeros(num_spokes, dtype=dtype)

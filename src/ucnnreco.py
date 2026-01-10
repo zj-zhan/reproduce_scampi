@@ -1,7 +1,3 @@
-__author__ = "Volker Herold"
-__year__ = "2023"
-__version__ = "0.0.1"
-
 import torch
 import torch.nn as nn
 from pathlib import Path
@@ -10,21 +6,21 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 import ast
 
-from models.c_scampi.loss import ScampiLoss as CScampiLoss
-from models.nc_scampi.loss import NCScampiLoss
-from utils.data_utils import load_tensor
+from src.models.c_scampi.loss import ScampiLoss as CScampiLoss
+from src.models.nc_scampi.loss import NCScampiLoss
+from src.utils.data_utils import load_tensor
 from sigpy.mri.app import EspiritCalib
-import models.c_scampi.unet_model as CScampiModel
-import models.nc_scampi.unet_model as NCScampiModel
+import src.models.c_scampi.unet_model as CScampiModel
+import src.models.nc_scampi.unet_model as NCScampiModel
 from functools import partial
 
-from utils.data_utils import toReal, toComplex, mda_slice, DipDataset, Trainer
-from utils.cartesian.transforms import cartesian_backward
-from utils.non_cartesian.transforms import radial_backward, radial_forward
-from utils.params import RecoParams
-from utils.params import dtype_mapping, dtype_cmapping
-from utils.non_cartesian.generate_kspace import NonCartesianKspaceGenerator
-from utils.non_cartesian.sampling import generate_golden_angle_radial_sampling_pattern
+from src.utils.data_utils import toReal, toComplex, mda_slice, DipDataset, Trainer
+from src.utils.cartesian.transforms import cartesian_backward
+from src.utils.non_cartesian.transforms import radial_backward, radial_forward
+from src.utils.params import RecoParams
+from src.utils.params import dtype_mapping, dtype_cmapping
+from src.utils.non_cartesian.generate_kspace import NonCartesianKspaceGenerator
+from src.utils.non_cartesian.sampling import generate_golden_angle_radial_sampling_pattern
 
 
 class UcnnReco(nn.Module):

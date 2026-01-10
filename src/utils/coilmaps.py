@@ -1,7 +1,3 @@
-__author__ = "Volker Herold, Thomas Siedler"
-__year__ = "2022"
-__status__ = "Experimental"
-
 from sigpy.mri.sim import birdcage_maps
 import random
 import torch
@@ -10,7 +6,7 @@ from typing import Union, Tuple
 from pathlib import Path
 import glob
 import os
-from utils.data_utils import rndraw
+from src.utils.data_utils import rndraw
 
 
 class CoilMaps:
