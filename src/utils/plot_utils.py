@@ -202,3 +202,32 @@ def visual_mask(mask, save_path):
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
+
+def visual_kspace(kspace, save_path):
+    n_coils, h, w = kspace.shape
+    kspace = np.log10(np.abs(kspace) + 1e-9)
+    stacked_img = kspace.transpose(1, 0, 2).reshape(h, -1)
+
+    fig_width = max(10, n_coils * 2) 
+    fig_height = 5
+    
+    fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
+    
+    im = ax.imshow(stacked_img, cmap='gray')
+    ax.set_title("Log(|kspace|)")
+    ax.axis('off')
+    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    plt.close()
+
+def visual_rss(rss, save_path):
+    fig, ax = plt.subplots(1, 1, figsize=(5, 4))
+    im = ax.imshow(rss, cmap='gray')
+    ax.set_title("RSS")
+    ax.axis('off')
+    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    plt.close()

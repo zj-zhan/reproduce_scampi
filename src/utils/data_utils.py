@@ -151,8 +151,8 @@ def toComplex(input: torch.Tensor, dim: int) -> torch.complex64:
     slice_indices_imag[dim] = slice(1, 2, 1)
 
     # Use the slice object to slice the tensor along the specified dimension
-    sliced_tensor_real = (input[slice_indices_real]).squeeze(dim)
-    sliced_tensor_imag = (input[slice_indices_imag]).squeeze(dim)
+    sliced_tensor_real = (input[tuple(slice_indices_real)]).squeeze(dim)
+    sliced_tensor_imag = (input[tuple(slice_indices_imag)]).squeeze(dim)
 
     res = torch.view_as_complex(
         torch.stack((sliced_tensor_real.to(torch.float32), sliced_tensor_imag.to(torch.float32)), dim=-1))

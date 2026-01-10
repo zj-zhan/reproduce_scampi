@@ -1,7 +1,7 @@
 import torch
 import numpy as np
-from src.utils.plot_utils import visual_mps, visual_mask
-from src.utils.data_utils import kspace_to_sensmaps_mvue
+from src.utils.plot_utils import visual_mps, visual_mask, visual_kspace, visual_rss
+from src.utils.data_utils import kspace_to_sensmaps_mvue, kspace_to_target
 from sigpy.mri.app import EspiritCalib
 
 highres_file_path = "/data0/zijian/project/github/reproduce_scampi/data/cartesian/brain_209_6001331/file_brain_AXT2_209_6001331_1_coilmap_highres.npy"
@@ -14,8 +14,11 @@ visual_mps(smap_low, 'lowres_coilmap.png')
 
 full_kspace_path = "/data0/zijian/project/github/reproduce_scampi/data/cartesian/brain_209_6001331/file_brain_AXT2_209_6001331_1.npy"
 kspace = np.load(full_kspace_path)
+rss = kspace_to_target(kspace)
 _,sens_map = kspace_to_sensmaps_mvue(kspace)
 visual_mps(sens_map, 'bart_coilmap.png')
+visual_kspace(kspace,'exp_kspace.png')
+visual_rss(rss,'exp_rss.png')
 
 app = EspiritCalib(kspace)
 sens_map_sigpy = app.run()

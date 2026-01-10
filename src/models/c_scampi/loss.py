@@ -177,7 +177,7 @@ class ScampiLoss(_Loss):
         loss = self.mdl.forward(input_tensor * self.sampling, target_tensor)
 
         # use the full k-space information before sparsity constraining
-        add_lines = torch.where(self.sampling, target_tensor, input_tensor)
+        add_lines = torch.where(self.sampling != 0, target_tensor, input_tensor)
 
         # wop and tv expect complex input
         input_img = kspace2image_torch(toComplex(add_lines, dim=1), self.fft_mask).squeeze(dim=0)

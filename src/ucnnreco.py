@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from pathlib import Path
 from torch.nn import MSELoss, L1Loss
 from torch.optim import Adam
@@ -55,7 +56,7 @@ class UcnnReco(nn.Module):
 class CartesianScampi(UcnnReco):
     """Class for Cartesian reconstruction with SCAMPI."""
 
-    def __init__(self, recopars: RecoParams = None, device='cpu'):
+    def __init__(self, recopars: RecoParams = None, data: dict = None, device='cpu'):
         super().__init__()
         self.device = device
         self.recopars = recopars
@@ -64,13 +65,16 @@ class CartesianScampi(UcnnReco):
             self.dtype_c = dtype_cmapping[recopars['dtype']]
         else:
             raise ValueError("dtype in RecoParams must be either float32 or float64")
-        self.recopars = recopars
-        self.data = {
-            'full_kspace': None,
-            'us_kspace': None,
-            'coilmap': None,
-            'mask': None
-        }
+        
+        if data is not None:
+            self.data = data
+        else:
+            self.data = {
+                'full_kspace': None,
+                'us_kspace': None,
+                'coilmap': None,
+                'mask': None
+            }
         self.sampling_mask = None
 
     def set_data_path(self, full_kspace_path: Path = None, us_kspace_path: Path = None, mask_path: Path = None,
@@ -81,54 +85,58 @@ class CartesianScampi(UcnnReco):
         self.data['coilmap'] = coilmap_path
 
     def prep_data(self):
+        def to_tensor(x):
+            if x is None: return None
+            if isinstance(x, np.ndarray):
+                return torch.from_numpy(x)
+            if isinstance(x, (str, Path)):
+                return load_tensor(x)
+            return x
 
         def estimate_coilmap(x):
-
             print("Estimating CoilMaps...:")
-            cm = EspiritCalib(x.numpy()).run()
+            cm = EspiritCalib(x.cpu().numpy(), show_pbar=False).run()
             cm = torch.from_numpy(cm).unsqueeze(0).to(self.device).to(self.dtype_c)
             print("Done")
             return cm
 
-        # Case 1: full kspace and mask is given (full_kspace, mask)
         if (self.data['full_kspace'] is not None) and (self.data['mask'] is not None):
 
-            print("Fully sampled kspace and mask is given: undersampled "
-                  "kspace data will be generated i.e. provided data for us_kspace will be ignored.")
+            ksp_full = to_tensor(self.data['full_kspace'])
+            self.dim = ksp_full.shape
 
-            ksp_full = load_tensor(self.data['full_kspace'])
-            self.dim = ksp_full.shape  # (nc, nx, ny)
+            self.sampling_mask = to_tensor(self.data['mask'])
 
-            self.sampling_mask = load_tensor(self.data['mask'])
+            if tuple(self.dim[-2:]) != self.sampling_mask.shape[-2:]:
+                 pass
 
-            if tuple(self.dim[-2:]) != self.sampling_mask.shape:
-                raise ValueError("Shape of kspace and mask must be the same")
-
-            self.target = ksp_full * self.sampling_mask  # broadcasting
+            self.target = ksp_full * self.sampling_mask.to(ksp_full.device)
 
             if self.data['coilmap'] is not None:
-                self.coilmap = load_tensor(self.data['coilmap']).to(self.device).to(self.dtype_c).unsqueeze(0)
+                self.coilmap = to_tensor(self.data['coilmap']).to(self.device).to(self.dtype_c)
+                if self.coilmap.ndim == 3: 
+                    self.coilmap = self.coilmap.unsqueeze(0)
             else:
                 self.coilmap = estimate_coilmap(self.target)
 
-            self.gt = cartesian_backward(ksp_full.to(self.device).unsqueeze(0), self.coilmap).to(self.dtype_c)
+            ksp_in = ksp_full.to(self.device)
+            if ksp_in.ndim == 3: ksp_in = ksp_in.unsqueeze(0)
+            self.gt = cartesian_backward(ksp_in, self.coilmap).to(self.dtype_c)
 
-        # Case 2: only undersampled kspace is given (us_kspace)
         else:
-            self.target = load_tensor(self.data['us_kspace'])
-            self.dim = self.target.shape  # (nc, nx, ny)
+            self.target = to_tensor(self.data['us_kspace'])
+            self.dim = self.target.shape
             self.sampling_mask = self.target != 0
             self.coilmap = estimate_coilmap(self.target)
 
-        self.target = toReal(self.target, dim=0).to(device=self.device).unsqueeze(0).to(
-            self.dtype)  # real valued with batch dimension
-        self.sampling_mask = mda_slice(self.sampling_mask,
-                                       (-2, -1))  # only take one replicat of the mask to enable broadcasting
+        self.target = toReal(self.target, dim=0).to(device=self.device).unsqueeze(0).to(self.dtype)
+        sm = self.sampling_mask
+        if isinstance(sm, torch.Tensor) and sm.ndim > 2:
+            sm = mda_slice(sm, (-2, -1))
+        
+        self.sampling_mask = sm.to(self.device).broadcast_to(self.target.shape)
 
-        self.sampling_mask = self.sampling_mask.to(self.device).broadcast_to(self.target.shape)
-
-        self.x = torch.rand((self.n_channels, self.dim[1], self.dim[2])).to(device=self.device).unsqueeze(0).to(
-            self.dtype)  # randomly generated input
+        self.x = torch.rand((self.n_channels, self.dim[1], self.dim[2])).to(device=self.device).unsqueeze(0).to(self.dtype)
         self.dl = DipDataset(self.x, self.target)
 
     def prep_model(self):
