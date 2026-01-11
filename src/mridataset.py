@@ -120,8 +120,8 @@ class MRIDataset(Dataset):
         tgt = kspace_to_target(kspace)
         
         #mvue, sens_map = calculate_mvue_and_sens(kspace)
-        #mvue, sens_map = kspace_to_sensmaps_mvue(kspace)
-        sens_map = EspiritCalib(kspace,show_pbar=False).run()
+        _, sens_map = kspace_to_sensmaps_mvue(kspace)
+        #sens_map = EspiritCalib(kspace,show_pbar=False).run()
 
         return {
             "kspace": kspace,   

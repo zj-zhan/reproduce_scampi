@@ -243,7 +243,7 @@ class Trainer:
 
     def train(self, epochs, name: str = "", preview: int = 0):
 
-        pbar = tqdm(total=epochs, position=0, leave=False)
+        pbar = tqdm(total=epochs, position=0, leave=False, disable=True)
         pbar.set_description(f"{name} Training: ")
         outputs = None
         for epoch in range(epochs):
@@ -361,7 +361,7 @@ def kspace_to_sensmaps_mvue(kspace: np.ndarray):
     mctgt = ifft2_np(kspace)
     mctgt = to_tensor(mctgt)
     mctgt = mctgt.unsqueeze(0)
-    sens_maps = bart(1, "ecalib -m1 -a -r24 -W -P", kspace[None, ...].transpose(0, 2, 3, 1))
+    sens_maps = bart(1, "ecalib -m1 -c0 -r24 -W", kspace[None, ...].transpose(0, 2, 3, 1))
     sens_maps = sens_maps.transpose(0, 3, 1, 2)
     S = to_tensor(sens_maps)
     mvue = get_mvue(mctgt, S)

@@ -3,6 +3,7 @@ os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 import sys
+import shutil
 from pathlib import Path
 import torch
 import numpy as np
@@ -13,6 +14,7 @@ from src.mridataset import MRIDataset
 from src.ucnnreco import CartesianScampi, NonCartesianScampi
 from src.utils.params import RecoParams
 from src.utils.util_eval import mae,mse,nmse,psnr,ssim
+from src.utils.plot_utils import plot_gt_pred
 
 def load_pt_mask(mask_path, device):
     if not os.path.exists(mask_path):
@@ -29,6 +31,10 @@ def load_pt_mask(mask_path, device):
     return mask_t.float().to(device)
 
 def main(args):
+    if os.path.exists(args.output_dir):
+        shutil.rmtree(args.output_dir)
+    os.makedirs(args.output_dir, exist_ok=True)
+    
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -78,21 +84,34 @@ def main(args):
         scampi.prep_data()
         scampi.prep_model()
         res = scampi.forward()
+
         gt_mag = torch.abs(scampi.gt).squeeze().cpu().numpy()
         res_mag = torch.abs(res).squeeze().cpu().numpy()
+        maxval0 = float(np.max(gt_mag))
         cur_nmse = nmse(gt_mag, res_mag)
-        cur_psnr = psnr(gt_mag, res_mag, gt_mag.max())
-        cur_ssim = ssim(gt_mag, res_mag, gt_mag.max())
+        cur_psnr = psnr(gt_mag, res_mag, maxval0)
+        cur_ssim = ssim(gt_mag, res_mag, maxval0)
 
         metric_log["nmse"].append(cur_nmse)
         metric_log["psnr"].append(cur_psnr)
         metric_log["ssim"].append(cur_ssim)
 
+        if i < 80:
+            plot_gt_pred(
+                gt=gt_mag,
+                pred=res_mag,
+                shape_raw=None,
+                max_value=maxval0,
+                output_dir=args.output_dir,
+                name_ids=fname,
+                escale=10.
+            )
+
     avg_nmse = np.mean(metric_log["nmse"])
     avg_psnr = np.mean(metric_log["psnr"])
     avg_ssim = np.mean(metric_log["ssim"])
     std_nmse = np.std(metric_log["nmse"])
-    std_psnr = np.mean(metric_log["psnr"])
+    std_psnr = np.std(metric_log["psnr"])
     std_ssim = np.std(metric_log["ssim"])
     
     print(f"Total Processed: {len(metric_log['psnr'])} slices")
@@ -104,6 +123,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_root', type=str, default= "/data0/zijian/data/DDS_data/exp-fmbrain")
     parser.add_argument('--mask_path', type=str, default= "/data0/zijian/project/github/reproduce_scampi/data/cartesian/brain_209_6001331/sampling/gaussian_0.5_3.pt")
+    parser.add_argument('--output_dir', type=str, default='./results/exp')
     
     args = parser.parse_args()
     main(args)
