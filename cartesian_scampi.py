@@ -15,6 +15,7 @@ from src.ucnnreco import CartesianScampi, NonCartesianScampi
 from src.utils.params import RecoParams
 from src.utils.util_eval import mae,mse,nmse,psnr,ssim
 from src.utils.plot_utils import plot_gt_pred
+from src.utils.data_utils import normalize_np
 
 def load_pt_mask(mask_path, device):
     if not os.path.exists(mask_path):
@@ -34,7 +35,7 @@ def main(args):
     if os.path.exists(args.output_dir):
         shutil.rmtree(args.output_dir)
     os.makedirs(args.output_dir, exist_ok=True)
-    
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -70,13 +71,13 @@ def main(args):
     pbar = tqdm(dataloader, total=len(dataloader), desc="Reconstructing")
 
     for i, batch in enumerate(pbar):
-        kspace_t = batch['kspace'].squeeze(0).to(device)
-        mps_t    = batch['mps'].squeeze(0).to(device)
-        fname    = batch['fname'][0]
+        kspace = batch['kspace'].squeeze(0).to(device)
+        mps    = batch['mps'].squeeze(0).to(device)
+        rss    = batch['rss'].squeeze(0)
         data_dict = {
-                'full_kspace': kspace_t,
+                'full_kspace': kspace,
                 'mask': mask,
-                'coilmap': mps_t,
+                'coilmap': mps,
                 'us_kspace': None
             }
 
@@ -85,12 +86,21 @@ def main(args):
         scampi.prep_model()
         res = scampi.forward()
 
-        gt_mag = torch.abs(scampi.gt).squeeze().cpu().numpy()
+        recon_coil_imgs = res * mps
+        rss_recon = torch.sqrt(torch.sum(torch.abs(recon_coil_imgs)**2, dim=0))
+        rss_recon = rss_recon.squeeze().cpu().numpy()
+
+        #gt_mag = torch.abs(scampi.gt).squeeze().cpu().numpy()
+        gt_mag = rss.squeeze().cpu().numpy()
         res_mag = torch.abs(res).squeeze().cpu().numpy()
         maxval0 = float(np.max(gt_mag))
-        cur_nmse = nmse(gt_mag, res_mag)
-        cur_psnr = psnr(gt_mag, res_mag, maxval0)
-        cur_ssim = ssim(gt_mag, res_mag, maxval0)
+
+        y = gt_mag
+        x = rss_recon
+
+        cur_nmse = nmse(y, x)
+        cur_psnr = psnr(y, x, maxval0)
+        cur_ssim = ssim(y, x, maxval0)
 
         metric_log["nmse"].append(cur_nmse)
         metric_log["psnr"].append(cur_psnr)
@@ -103,7 +113,7 @@ def main(args):
                 shape_raw=None,
                 max_value=maxval0,
                 output_dir=args.output_dir,
-                name_ids=fname,
+                name_ids=i,
                 escale=10.
             )
 

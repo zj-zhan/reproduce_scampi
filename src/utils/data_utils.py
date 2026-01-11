@@ -368,3 +368,9 @@ def kspace_to_sensmaps_mvue(kspace: np.ndarray):
     mvue = mvue.squeeze().cpu().numpy()
     sens_maps = sens_maps.squeeze(0)
     return mvue.astype(np.complex64), sens_maps.astype(np.complex64)
+
+def normalize_np(img):
+    """ Normalize img in arbitrary range to [0, 1] """
+    #img -= np.min(img)
+    img /= np.max(img)
+    return img

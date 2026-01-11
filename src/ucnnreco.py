@@ -16,7 +16,6 @@ import src.models.nc_scampi.unet_model as NCScampiModel
 from functools import partial
 
 from src.utils.data_utils import toReal, toComplex, mda_slice, DipDataset, Trainer
-from src.utils.cartesian.transforms import cartesian_backward
 from src.utils.non_cartesian.transforms import radial_backward, radial_forward
 from src.utils.params import RecoParams
 from src.utils.params import dtype_mapping, dtype_cmapping
