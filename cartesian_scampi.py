@@ -14,6 +14,7 @@ from src.mridataset import MRIDataset
 from src.ucnnreco import CartesianScampi, NonCartesianScampi
 from src.utils.params import RecoParams
 from src.utils.util_eval import nmse,psnr,ssim,get_mask
+from src.utils.util_eval import center_crop,img3_rm_black_border
 from src.utils.plot_utils import plot_gt_pred
 
 def main(args):
@@ -64,10 +65,11 @@ def main(args):
     dummy_img = torch.zeros(1, 1, args.target_size, args.target_size).to(device)
 
     for i, batch in enumerate(pbar):
-        kspace = batch['kspace'].squeeze(0).to(device)
-        rss    = batch['rss'].squeeze(0)
-        maxval = batch['max_val'].squeeze(0).item()
-        mvue   = batch['mvue'].squeeze(0)
+        kspace    = batch['kspace'].squeeze(0).to(device)
+        rss       = batch['rss'].squeeze(0)
+        maxval    = batch['max_val'].squeeze(0).item()
+        mvue      = batch['mvue'].squeeze(0)
+        shape_raw = batch["shape_raw"]
         mask = get_mask(
             img=dummy_img, 
             size=args.target_size, 
@@ -107,6 +109,12 @@ def main(args):
         #rss_recon = np.sqrt(np.sum(np.abs(recon_coil_imgs)**2, axis=0)) #for rss eval
         #y = gt
         #x = rss_recon
+
+        target_shape = shape_raw[0].cpu().numpy()
+
+        y = center_crop(y, target_shape)
+        x = center_crop(x, target_shape)
+        y, x, _ = img3_rm_black_border(y, x)
 
         maxval0 = float(np.max(y)) #for 2d eval
         maxval1 = maxval #for 3d eval
