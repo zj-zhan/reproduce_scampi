@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from pathlib import Path
 from typing import Union, Dict, Any
+from bart import bart
 from sigpy.mri.app import EspiritCalib
 from torch.utils.data import Dataset
 from src.utils.data_utils import ifft2_np, fft2_np, kspace_to_target
@@ -120,12 +121,13 @@ class MRIDataset(Dataset):
         tgt = kspace_to_target(kspace)
         
         #mvue, sens_map = calculate_mvue_and_sens(kspace)
-        _, sens_map = kspace_to_sensmaps_mvue(kspace)  #bart
+        mvue, sens_map = kspace_to_sensmaps_mvue(kspace)  #bart
         #sens_map = EspiritCalib(kspace,show_pbar=False).run()  #sigpy
 
         return {
             "kspace": kspace,   
-            "mps": sens_map,
+            #"mps": sens_map,
+            "mvue": mvue,
             "rss": tgt,
             "max_val": max_value,
             "idx": idx,

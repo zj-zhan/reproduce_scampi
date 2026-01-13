@@ -195,9 +195,7 @@ def visual_mask(mask, save_path):
     mask_to_plot = mask_disp.T 
     fig, ax = plt.subplots(figsize=(8, 8)) 
     im = ax.imshow(mask_to_plot, cmap='gray', aspect='auto', interpolation='nearest', vmin=0, vmax=1)
-    ax.set_title(f"K-space Mask Visualization\nShape: {mask_disp.shape} (PE, FE), R ≈ {acceleration:.2f}x\nSampled Lines: {sampled_lines} / {total_pe_lines}")
-    ax.set_xlabel("Phase Encoding Direction (X-axis)")
-    ax.set_ylabel("Frequency Encoding Direction (Y-axis)") 
+    ax.set_title(f"K-space Mask Visualization\nShape: {mask_disp.shape}, R ≈ {acceleration:.2f}x\nSampled Lines: {sampled_lines} / {total_pe_lines}")
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')

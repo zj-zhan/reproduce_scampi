@@ -16,7 +16,9 @@ import src.models.nc_scampi.unet_model as NCScampiModel
 from functools import partial
 
 from src.utils.data_utils import toReal, toComplex, mda_slice, DipDataset, Trainer
+from src.utils.cartesian.transforms import cartesian_backward
 from src.utils.non_cartesian.transforms import radial_backward, radial_forward
+from src.utils.plot_utils import visual_mps
 from src.utils.params import RecoParams
 from src.utils.params import dtype_mapping, dtype_cmapping
 from src.utils.non_cartesian.generate_kspace import NonCartesianKspaceGenerator
@@ -93,10 +95,10 @@ class CartesianScampi(UcnnReco):
             return x
 
         def estimate_coilmap(x):
-            print("Estimating CoilMaps...:")
+            #print("Estimating CoilMaps...:")
             cm = EspiritCalib(x.cpu().numpy(), show_pbar=False).run()
             cm = torch.from_numpy(cm).unsqueeze(0).to(self.device).to(self.dtype_c)
-            print("Done")
+            #print("Done")
             return cm
 
         if (self.data['full_kspace'] is not None) and (self.data['mask'] is not None):
@@ -107,7 +109,7 @@ class CartesianScampi(UcnnReco):
             self.sampling_mask = to_tensor(self.data['mask'])
 
             if tuple(self.dim[-2:]) != self.sampling_mask.shape[-2:]:
-                 pass
+                raise ValueError("Shape of kspace and mask must be the same")
 
             self.target = ksp_full * self.sampling_mask.to(ksp_full.device)
 

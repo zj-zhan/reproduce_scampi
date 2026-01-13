@@ -13,23 +13,8 @@ from torch.utils.data import DataLoader
 from src.mridataset import MRIDataset
 from src.ucnnreco import CartesianScampi, NonCartesianScampi
 from src.utils.params import RecoParams
-from src.utils.util_eval import mae,mse,nmse,psnr,ssim
+from src.utils.util_eval import nmse,psnr,ssim,get_mask
 from src.utils.plot_utils import plot_gt_pred
-from src.utils.data_utils import normalize_np
-
-def load_pt_mask(mask_path, device):
-    if not os.path.exists(mask_path):
-        raise FileNotFoundError(f"Mask not found: {mask_path}")
-    mask_t = torch.load(mask_path, map_location='cpu')
-    if isinstance(mask_t, np.ndarray):
-        mask_t = torch.from_numpy(mask_t)
-    mask_t = mask_t.squeeze()
-    if mask_t.ndim > 2:
-        if mask_t.shape[0] < mask_t.shape[-1]: 
-            mask_t = mask_t[0, ...] 
-        else:
-            mask_t = mask_t[..., 0]
-    return mask_t.float().to(device)
 
 def main(args):
     if os.path.exists(args.output_dir):
@@ -38,17 +23,21 @@ def main(args):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
+    print(f"Sampling: Type={args.mask_type}, Acc={args.acc_factor}x, Center={args.center_fraction}")
 
     config_path = 'src/config/CScampi.json' 
     cartesian_params = RecoParams()
     cartesian_params.from_json(config_path)
     print(cartesian_params)
 
-    mask = load_pt_mask(args.mask_path, device)
+    #mask = load_pt_mask(args.mask_path, device)
+    #mask = mask.T
+    #mask_visual = mask.cpu().numpy()
+    #visual_mask(mask_visual, "mask.png")
 
     dataset = MRIDataset(
         root=args.data_root,
-        target_size=396, 
+        target_size=args.target_size, 
         which_data="brain",
         data_norm_type="volume_max",
         device=device
@@ -64,76 +53,113 @@ def main(args):
 
     metric_log = {
         "nmse": [],
-        "psnr": [],
-        "ssim": [],
+        "psnr2d": [],
+        "ssim2d": [],
+        "psnr3d": [],
+        "ssim3d": [],
     }
 
     pbar = tqdm(dataloader, total=len(dataloader), desc="Reconstructing")
 
+    dummy_img = torch.zeros(1, 1, args.target_size, args.target_size).to(device)
+
     for i, batch in enumerate(pbar):
         kspace = batch['kspace'].squeeze(0).to(device)
-        mps    = batch['mps'].squeeze(0).to(device)
         rss    = batch['rss'].squeeze(0)
+        maxval = batch['max_val'].squeeze(0).item()
+        mvue   = batch['mvue'].squeeze(0)
+        mask = get_mask(
+            img=dummy_img, 
+            size=args.target_size, 
+            batch_size=1, 
+            type=args.mask_type, 
+            acc_factor=args.acc_factor, 
+            center_fraction=args.center_fraction,
+            fix=False 
+        )
+        mask = mask.squeeze()
         data_dict = {
                 'full_kspace': kspace,
                 'mask': mask,
-                'coilmap': mps,
+                'coilmap': None,
                 'us_kspace': None
             }
 
         scampi = CartesianScampi(cartesian_params, data_dict, device)
         scampi.prep_data()
         scampi.prep_model()
-        res = scampi.forward()
+        mps = scampi.coilmap
+        mps = mps.squeeze().cpu().numpy()
+        res = scampi()
 
-        recon_coil_imgs = res * mps
-        rss_recon = torch.sqrt(torch.sum(torch.abs(recon_coil_imgs)**2, dim=0))
-        rss_recon = rss_recon.squeeze().cpu().numpy()
 
-        #gt_mag = torch.abs(scampi.gt).squeeze().cpu().numpy()
-        gt_mag = rss.squeeze().cpu().numpy()
-        res_mag = torch.abs(res).squeeze().cpu().numpy()
-        maxval0 = float(np.max(gt_mag))
+        #gt = torch.abs(scampi.get_gt()).squeeze().cpu().numpy() #for mvue eval
+        #eval on mvue (gt same as DDS)
+        gt = np.abs(mvue).squeeze().cpu().numpy() 
+        res = torch.abs(res).squeeze().cpu().numpy()
+        y = gt
+        x = res
 
-        y = gt_mag
-        x = rss_recon
+        #eval on rss
+        #gt = rss.squeeze().cpu().numpy() # for rss eval
+        #res = res.squeeze().cpu().numpy()
+        #recon_coil_imgs = res * mps
+        #rss_recon = np.sqrt(np.sum(np.abs(recon_coil_imgs)**2, axis=0)) #for rss eval
+        #y = gt
+        #x = rss_recon
+
+        maxval0 = float(np.max(y)) #for 2d eval
+        maxval1 = maxval #for 3d eval
 
         cur_nmse = nmse(y, x)
-        cur_psnr = psnr(y, x, maxval0)
-        cur_ssim = ssim(y, x, maxval0)
-
+        cur_psnr2d = psnr(y, x, maxval0)
+        cur_ssim2d = ssim(y, x, maxval0)
+        cur_psnr3d = psnr(y, x, maxval1)
+        cur_ssim3d = ssim(y, x, maxval1)
         metric_log["nmse"].append(cur_nmse)
-        metric_log["psnr"].append(cur_psnr)
-        metric_log["ssim"].append(cur_ssim)
+        metric_log["psnr2d"].append(cur_psnr2d)
+        metric_log["ssim2d"].append(cur_ssim2d)
+        metric_log["psnr3d"].append(cur_psnr3d)
+        metric_log["ssim3d"].append(cur_ssim3d)
 
         if i < 80:
             plot_gt_pred(
-                gt=gt_mag,
-                pred=res_mag,
+                gt=y,
+                pred=x,
                 shape_raw=None,
-                max_value=maxval0,
+                max_value=maxval1,
                 output_dir=args.output_dir,
                 name_ids=i,
                 escale=10.
             )
 
     avg_nmse = np.mean(metric_log["nmse"])
-    avg_psnr = np.mean(metric_log["psnr"])
-    avg_ssim = np.mean(metric_log["ssim"])
+    avg_psnr2d = np.mean(metric_log["psnr2d"])
+    avg_ssim2d = np.mean(metric_log["ssim2d"])
+    avg_psnr3d = np.mean(metric_log["psnr3d"])
+    avg_ssim3d = np.mean(metric_log["ssim3d"])
     std_nmse = np.std(metric_log["nmse"])
-    std_psnr = np.std(metric_log["psnr"])
-    std_ssim = np.std(metric_log["ssim"])
+    std_psnr2d = np.std(metric_log["psnr2d"])
+    std_ssim2d = np.std(metric_log["ssim2d"])
+    std_psnr3d = np.std(metric_log["psnr3d"])
+    std_ssim3d = np.std(metric_log["ssim3d"])
     
-    print(f"Total Processed: {len(metric_log['psnr'])} slices")
+    print(f"Total Processed: {len(metric_log['nmse'])} slices")
     print(f"NMSE: {avg_nmse:.5f} +/- {std_nmse:5f}")
-    print(f"PSNR: {avg_psnr:.5f} +/- {std_psnr:5f}")
-    print(f"SSIM: {avg_ssim:.5f} +/- {std_ssim:.5f}")
+    print(f"PSNR2d: {avg_psnr2d:.5f} +/- {std_psnr2d:5f}")
+    print(f"SSIM2d: {avg_ssim2d:.5f} +/- {std_ssim2d:.5f}")
+    print(f"PSNR3d: {avg_psnr3d:.5f} +/- {std_psnr3d:5f}")
+    print(f"SSIM3d: {avg_ssim3d:.5f} +/- {std_ssim3d:.5f}")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_root', type=str, default= "/data0/zijian/data/DDS_data/exp-fmbrain")
-    parser.add_argument('--mask_path', type=str, default= "/data0/zijian/project/github/reproduce_scampi/data/cartesian/brain_209_6001331/sampling/gaussian_0.5_3.pt")
-    parser.add_argument('--output_dir', type=str, default='./results/exp')
+    #parser.add_argument('--mask_path', type=str, default= "/data0/zijian/project/github/reproduce_scampi/data/cartesian/brain_209_6001331/sampling/gaussian_0.5_3.pt")
+    parser.add_argument('--output_dir', type=str, default='./results/exp2_equi320_mvue_rss')
+    parser.add_argument('--mask_type', type=str, default='equispaced1d')
+    parser.add_argument('--acc_factor', type=float, default=4.0)
+    parser.add_argument('--center_fraction', type=float, default=0.08)
+    parser.add_argument('--target_size', type=int, default=320)
     
     args = parser.parse_args()
     main(args)
